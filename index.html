@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- GAMEMONETIZE AD SDK -->
+    <script src="https://api.gamemonetize.com/sdk.js"></script>
+
     <!-- Dynamic Manifest Placeholder (Populated by JS below) -->
     <link id="dynamic-manifest" rel="manifest">
 
@@ -28,7 +31,6 @@
         }
 
         // DYNAMIC MANIFEST GENERATION
-        // This creates the manifest.json on the fly so you don't need a second file.
         const manifestData = {
             "name": "Brick Breaker Rewards",
             "short_name": "BrickBreaker",
@@ -46,28 +48,12 @@
                     "type": "image/png",
                     "purpose": "any maskable"
                 }
-            ],
-            "screenshots": [
-                {
-                    "src": "https://cdn-icons-png.flaticon.com/512/2666/2666484.png",
-                    "sizes": "512x512",
-                    "type": "image/png",
-                    "form_factor": "narrow"
-                }
             ]
         };
         const stringManifest = JSON.stringify(manifestData);
         const blob = new Blob([stringManifest], {type: 'application/json'});
         const manifestURL = URL.createObjectURL(blob);
         document.querySelector('#dynamic-manifest').setAttribute('href', manifestURL);
-                // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service Worker registered!'))
-                    .catch(err => console.log('Service Worker registration failed:', err));
-            });
-        }
     </script>
 
     <style>
@@ -610,6 +596,9 @@
         const db = getDatabase(firebaseApp);
         let currentUser = null;
 
+        // Your GameMonetize Game ID
+        const GAME_ID = "z4vmvtm4s3n9dkgr7ul3xte8pwyasgbs";
+
         // Get Audio Element
         const bgMusic = document.getElementById('bgMusic');
         bgMusic.volume = 0.5; 
@@ -928,13 +917,22 @@
 
             watchRewardedAd() {
                 if (this.state.adsWatchedToday >= 20) { alert("Daily ad limit reached (20/20)!"); return; }
-                alert("Simulating Rewarded Video Ad View...");
-                setTimeout(() => {
-                    const reward = Math.floor(Math.random() * 51) + 50;
-                    this.state.adsWatchedToday++;
-                    this.addCoins(reward);
-                    this.renderEarnScreen();
-                }, 800);
+                
+                // Call GameMonetize SDK
+                if (typeof sdk !== 'undefined' && sdk.showRewardedAd) {
+                    sdk.showRewardedAd(GAME_ID, () => {
+                        // Success callback (Ad Watched)
+                        const reward = Math.floor(Math.random() * 51) + 50;
+                        this.state.adsWatchedToday++;
+                        this.addCoins(reward);
+                        this.renderEarnScreen();
+                    }, () => {
+                        // Failure / Cancelled callback
+                        alert("Ad was not finished. No coins awarded.");
+                    });
+                } else {
+                    alert("Ad service not ready yet. Please try again later.");
+                }
             },
 
             openBoxModal() {
@@ -953,14 +951,22 @@
             },
 
             openSingleBox(num) {
-                alert(`Watching Video Ad to unlock Box #${num}...`);
-                setTimeout(() => {
-                    const reward = Math.floor(Math.random() * 1701) + 100;
-                    this.state.boxesOpenedToday++;
-                    this.addCoins(reward);
-                    document.getElementById('boxModal').classList.add('hidden');
-                    this.renderEarnScreen();
-                }, 800);
+                // Call GameMonetize SDK
+                if (typeof sdk !== 'undefined' && sdk.showRewardedAd) {
+                    sdk.showRewardedAd(GAME_ID, () => {
+                        // Success callback
+                        const reward = Math.floor(Math.random() * 1701) + 100;
+                        this.state.boxesOpenedToday++;
+                        this.addCoins(reward);
+                        document.getElementById('boxModal').classList.add('hidden');
+                        this.renderEarnScreen();
+                    }, () => {
+                        // Failure
+                        alert("Ad was not finished. Box not opened.");
+                    });
+                } else {
+                    alert("Ad service not ready yet. Please try again later.");
+                }
             },
 
             claimDailyStreak() {
