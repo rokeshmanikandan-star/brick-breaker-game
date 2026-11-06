@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Brick Breaker: Shoot & Blast Rewards</title>
-    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Dynamic Manifest Placeholder (Populated by JS below) -->
+    <link id="dynamic-manifest" rel="manifest">
+
     <script>
         tailwind.config = {
             theme: {
@@ -23,7 +26,42 @@
                 }
             }
         }
+
+        // DYNAMIC MANIFEST GENERATION
+        // This creates the manifest.json on the fly so you don't need a second file.
+        const manifestData = {
+            "name": "Brick Breaker Rewards",
+            "short_name": "BrickBreaker",
+            "description": "Play Brick Breaker and earn rewards!",
+            "start_url": "./",
+            "display": "standalone",
+            "orientation": "portrait",
+            "id": "/brick-breaker-game/",
+            "background_color": "#080d1e",
+            "theme_color": "#131e42",
+            "icons": [
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/512/2666/2666484.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ],
+            "screenshots": [
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/512/2666/2666484.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "form_factor": "narrow"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifestData);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('#dynamic-manifest').setAttribute('href', manifestURL);
     </script>
+
     <style>
         * { user-select: none; -webkit-user-select: none; }
         html, body { overscroll-behavior: none; }
@@ -98,7 +136,7 @@
 <body class="flex justify-center items-center h-[100dvh] w-screen bg-slate-950">
 
     <!-- HTML5 Audio Tag for Background Music -->
-    <audio id="bgMusic" loop src="https://assets.mixkit.co/music/preview/mixkit-video-game-retro-loop-763.mp3"></audio>
+    <audio id="bgMusic" loop preload="auto" src="https://assets.mixkit.co/music/preview/mixkit-video-game-retro-loop-763.mp3"></audio>
 
     <!-- LOADING OVERLAY -->
     <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center hidden">
@@ -223,6 +261,13 @@
                         </div>
                         <i class="fa-solid fa-lock text-yellow-400 text-sm mr-1"></i>
                     </div>
+                </div>
+
+                <!-- Music Toggle Button on Home Screen -->
+                <div class="absolute top-4 right-4 z-20">
+                    <button id="homeMusicBtn" onclick="app.toggleMusic()" class="w-10 h-10 rounded-full gloss-card flex items-center justify-center text-white active:scale-90 transition-transform">
+                        <i id="homeMusicIcon" class="fa-solid fa-volume-high text-cyan-400"></i>
+                    </button>
                 </div>
 
                 <div class="flex flex-col items-center text-center my-auto space-y-4">
@@ -534,7 +579,7 @@
 
     <!-- FIREBASE & GAME SCRIPT -->
     <script type="module">
-        // Import Firebase SDKs (Removed unused signInWithEmailAndPassword to fix warning)
+        // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
@@ -559,7 +604,7 @@
 
         // Get Audio Element
         const bgMusic = document.getElementById('bgMusic');
-        bgMusic.volume = 0.4; 
+        bgMusic.volume = 0.5; 
 
         window.app = {
             state: {
@@ -576,6 +621,14 @@
             init() {
                 this.bindEvents();
                 this.checkAuthState();
+                
+                // Force audio unlock on first tap anywhere
+                document.body.addEventListener('click', function unlockAudio() {
+                    if (window.app.state.settings.music) {
+                        bgMusic.play().catch(e => console.log("Audio unlock blocked:", e));
+                    }
+                    document.body.removeEventListener('click', unlockAudio);
+                }, { once: true });
             },
 
             checkAuthState() {
@@ -633,27 +686,32 @@
             },
 
             syncMusic() {
-                if (this.state.settings.music && this.state.registered) {
-                    bgMusic.play().catch(e => {
-                        console.log("Audio play blocked or failed:", e);
-                    });
+                if (this.state.settings.music) {
+                    let playPromise = bgMusic.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(_ => {
+                            document.getElementById('homeMusicIcon').className = "fa-solid fa-volume-high text-cyan-400";
+                        }).catch(error => {
+                            console.log("Music blocked. Tap to play.");
+                            document.getElementById('homeMusicIcon').className = "fa-solid fa-volume-xmark text-slate-500";
+                        });
+                    }
                 } else {
                     bgMusic.pause();
+                    document.getElementById('homeMusicIcon').className = "fa-solid fa-volume-xmark text-slate-500";
                 }
+            },
+
+            toggleMusic() {
+                this.state.settings.music = !this.state.settings.music;
+                document.getElementById('musicToggle').checked = this.state.settings.music;
+                this.syncMusic();
+                this.saveProgress();
             },
 
             bindEvents() {
                 document.getElementById('welcomeStartBtn').addEventListener('click', () => {
-                    if (this.state.settings.music) {
-                        bgMusic.play().then(() => {
-                            console.log("Audio started successfully!");
-                        }).catch(e => {
-                            console.log("Browser blocked audio:", e);
-                            if (e.name === 'NotAllowedError') {
-                                alert("Browser blocked music autoplay. Please ensure your phone is not on silent mode and try tapping the screen again.");
-                            }
-                        });
-                    }
+                    this.syncMusic(); 
                     
                     if (!this.state.acceptedTerms) this.showScreen('termsScreen');
                     else this.showScreen('registerScreen');
@@ -1448,12 +1506,6 @@
         
         // Initialize App
         window.addEventListener('DOMContentLoaded', () => window.app.init());
-      // Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js');
-  });
-}
     </script>
 </body>
 </html>
