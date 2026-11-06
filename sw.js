@@ -1,8 +1,7 @@
 const CACHE_NAME = 'brick-breaker-v1';
 const ASSETS = [
   './',
-  './index.html',
-  './manifest.json'
+  './index.html'
 ];
 
 self.addEventListener('install', (e) => {
