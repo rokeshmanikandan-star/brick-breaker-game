@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.rokeshmanikandan_star.twa",
+        "sha256_cert_fingerprints": ["4C:24:21:FF:BF:30:8C:4A:9B:58:04:10:3C:4F:8E:69:86:BF:44:3A:37:3A:1F:7E:D0:F7:A6:AE:1D:5D:05:55"]
+      }
+    }]
