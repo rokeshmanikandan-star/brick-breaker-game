@@ -4,6 +4,8 @@
   "description": "Play Brick Breaker and earn rewards!",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "portrait",
+  "id": "/brick-breaker-game/",
   "background_color": "#080d1e",
   "theme_color": "#131e42",
   "icons": [
@@ -12,6 +14,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2666/2666484.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }
