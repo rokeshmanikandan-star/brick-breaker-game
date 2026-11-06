@@ -1,0 +1,17 @@
+{
+  "name": "Brick Breaker Rewards",
+  "short_name": "BrickBreaker",
+  "description": "Play Brick Breaker and earn rewards!",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080d1e",
+  "theme_color": "#131e42",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2666/2666484.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
