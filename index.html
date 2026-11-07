@@ -8,8 +8,38 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- GAMEMONETIZE AD SDK -->
-    <script src="https://api.gamemonetize.com/sdk.js"></script>
+    <!-- OFFICIAL GAMEMONETIZE SDK -->
+    <script type="text/javascript">
+       window.SDK_OPTIONS = {
+          gameId: "z4vmvtm4s3n9dkgr7ul3xte8pwyasgbs",
+          onEvent: function (a) {
+             switch (a.name) {
+                case "SDK_GAME_PAUSE":
+                   // Pause game logic and mute audio
+                   if (window.gameEngine && window.gameEngine.isRunning) {
+                       window.gameEngine.isPaused = true;
+                   }
+                   const bgMusic = document.getElementById('bgMusic');
+                   if (bgMusic) bgMusic.pause();
+                   break;
+                case "SDK_GAME_START":
+                   // Ad is done, resume game logic and unmute audio
+                   if (window.gameEngine && window.gameEngine.isRunning) {
+                       window.gameEngine.isPaused = false;
+                   }
+                   if (window.app && window.app.state.settings.music) {
+                       const bgMusic = document.getElementById('bgMusic');
+                       if (bgMusic) bgMusic.play().catch(e=>console.log(e));
+                   }
+                   break;
+             }
+          }
+       };
+    (function (a, b, c) {
+       var d = a.getElementsByTagName(b)[0];
+       a.getElementById(c) || (a = a.createElement(b), a.id = c, a.src = "https://api.gamemonetize.com/sdk.js", d.parentNode.insertBefore(a, d))
+    })(document, "script", "gamemonetize-sdk"); 
+    </script>
 
     <!-- Dynamic Manifest Placeholder (Populated by JS below) -->
     <link id="dynamic-manifest" rel="manifest">
@@ -38,7 +68,6 @@
             "start_url": "./",
             "display": "standalone",
             "orientation": "portrait",
-            "id": "/brick-breaker-game/",
             "background_color": "#080d1e",
             "theme_color": "#131e42",
             "icons": [
@@ -129,10 +158,8 @@
 </head>
 <body class="flex justify-center items-center h-[100dvh] w-screen bg-slate-950">
 
-    <!-- HTML5 Audio Tag for Background Music -->
     <audio id="bgMusic" loop preload="auto" src="https://assets.mixkit.co/music/preview/mixkit-video-game-retro-loop-763.mp3"></audio>
 
-    <!-- LOADING OVERLAY -->
     <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center hidden">
         <div class="loader mb-4"></div>
         <h2 class="text-white font-black text-xl">Syncing Data...</h2>
@@ -190,16 +217,16 @@
             </button>
         </div>
 
-        <!-- SCREEN 1C: REGISTRATION (LOGIN/SIGNUP) -->
+        <!-- SCREEN 1C: REGISTRATION / LOGIN -->
         <div id="registerScreen" class="hidden absolute inset-0 z-[60] flex flex-col justify-between p-6 game-screen-bg pb-safe">
             <div class="space-y-4 my-auto">
                 <div class="text-center mb-2">
                     <i class="fa-solid fa-user-plus text-4xl text-emerald-400"></i>
-                    <h2 class="text-2xl font-black text-white mt-2">Create Account</h2>
+                    <h2 id="authTitle" class="text-2xl font-black text-white mt-2">Create Account</h2>
                 </div>
 
                 <div class="space-y-3">
-                    <div>
+                    <div id="nameField">
                         <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Player Name</label>
                         <input type="text" id="regName" placeholder="Enter player handle" class="w-full px-4 py-3 bg-slate-950 border border-blue-800 rounded-xl text-sm text-white focus:outline-none focus:border-cyan-400">
                     </div>
@@ -212,9 +239,14 @@
                         <input type="password" id="regPassword" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-950 border border-blue-800 rounded-xl text-sm text-white focus:outline-none focus:border-cyan-400">
                     </div>
                 </div>
+                
+                <!-- Toggle Login/Signup Link -->
+                <div class="text-center mt-2">
+                    <button type="button" id="toggleAuthBtn" onclick="app.toggleAuthMode()" class="text-xs text-cyan-300 font-bold underline">Already have an account? Log In</button>
+                </div>
             </div>
 
-            <button onclick="app.completeRegistration()" class="w-full py-4 gloss-btn-green rounded-2xl font-black text-lg tracking-wider text-white">
+            <button id="authSubmitBtn" onclick="app.handleAuth()" class="w-full py-4 gloss-btn-green rounded-2xl font-black text-lg tracking-wider text-white">
                 CREATE PROFILE & PLAY
             </button>
         </div>
@@ -575,7 +607,7 @@
     <script type="module">
         // Import Firebase SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         // Your Firebase Configuration
@@ -596,9 +628,6 @@
         const db = getDatabase(firebaseApp);
         let currentUser = null;
 
-        // Your GameMonetize Game ID
-        const GAME_ID = "z4vmvtm4s3n9dkgr7ul3xte8pwyasgbs";
-
         // Get Audio Element
         const bgMusic = document.getElementById('bgMusic');
         bgMusic.volume = 0.5; 
@@ -607,6 +636,7 @@
             state: {
                 acceptedTerms: false, 
                 registered: false, 
+                isLoginMode: false, // NEW: Toggle between Login and Signup
                 adsWatchedToday: 0, 
                 boxesOpenedToday: 0,
                 lastClaimDate: null, 
@@ -706,6 +736,26 @@
                 this.saveProgress();
             },
 
+            toggleAuthMode() {
+                this.state.isLoginMode = !this.state.isLoginMode;
+                const title = document.getElementById('authTitle');
+                const nameField = document.getElementById('nameField');
+                const submitBtn = document.getElementById('authSubmitBtn');
+                const toggleBtn = document.getElementById('toggleAuthBtn');
+
+                if (this.state.isLoginMode) {
+                    title.innerText = "Log In";
+                    nameField.classList.add('hidden');
+                    submitBtn.innerText = "LOG IN";
+                    toggleBtn.innerText = "Don't have an account? Sign Up";
+                } else {
+                    title.innerText = "Create Account";
+                    nameField.classList.remove('hidden');
+                    submitBtn.innerText = "CREATE PROFILE & PLAY";
+                    toggleBtn.innerText = "Already have an account? Log In";
+                }
+            },
+
             bindEvents() {
                 document.getElementById('welcomeStartBtn').addEventListener('click', () => {
                     this.syncMusic(); 
@@ -750,49 +800,59 @@
                 this.showScreen('registerScreen');
             },
 
-            async completeRegistration() {
-                const name = document.getElementById('regName').value.trim();
+            async handleAuth() {
                 const email = document.getElementById('regEmail').value.trim();
                 const password = document.getElementById('regPassword').value.trim();
+                const name = document.getElementById('regName').value.trim();
                 
-                if (!name) { alert("Please enter a valid player name."); return; }
-                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Please enter a valid email address (e.g., yourname@gmail.com)."); return; }
+                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Please enter a valid email address."); return; }
                 if (password.length < 6) { alert("Password must be at least 6 characters long."); return; }
+                if (!this.state.isLoginMode && !name) { alert("Please enter a player name."); return; }
 
                 document.getElementById('loadingOverlay').classList.remove('hidden');
 
                 try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    currentUser = userCredential.user;
-
-                    this.state.player.name = name;
-                    this.state.player.email = email;
-                    this.state.player.currentLevel = 1;
-                    this.state.player.coins = 500;
-                    this.state.player.lives = 5;
-                    this.state.registered = true;
-                    this.state.settings = { music: true, sound: true };
-                    
-                    await set(ref(db, 'users/' + currentUser.uid), {
-                        player: this.state.player,
-                        adsWatchedToday: 0,
-                        boxesOpenedToday: 0,
-                        streakDay: 1,
-                        lastClaimDate: null,
-                        settings: this.state.settings,
-                        createdAt: new Date().toISOString()
-                    });
-
-                    this.showToast("Account created successfully!");
-                    this.showScreen('homeScreen');
-                    this.syncMusic();
-
-                } catch (error) {
-                    console.error("Registration Error:", error);
-                    if (error.code === 'auth/email-already-in-use') {
-                        alert("This email is already registered. Please log in instead (or use a different email).");
+                    if (this.state.isLoginMode) {
+                        // LOG IN
+                        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                        currentUser = userCredential.user;
+                        this.showToast("Logged in successfully!");
+                        // onAuthStateChanged will handle the rest (fetch data, show home)
                     } else {
-                        alert("Error creating account: " + error.message);
+                        // SIGN UP
+                        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                        currentUser = userCredential.user;
+
+                        this.state.player.name = name;
+                        this.state.player.email = email;
+                        this.state.player.currentLevel = 1;
+                        this.state.player.coins = 500;
+                        this.state.player.lives = 5;
+                        this.state.registered = true;
+                        this.state.settings = { music: true, sound: true };
+                        
+                        await set(ref(db, 'users/' + currentUser.uid), {
+                            player: this.state.player,
+                            adsWatchedToday: 0,
+                            boxesOpenedToday: 0,
+                            streakDay: 1,
+                            lastClaimDate: null,
+                            settings: this.state.settings,
+                            createdAt: new Date().toISOString()
+                        });
+
+                        this.showToast("Account created successfully!");
+                        this.showScreen('homeScreen');
+                        this.syncMusic();
+                    }
+                } catch (error) {
+                    console.error("Auth Error:", error);
+                    if (error.code === 'auth/email-already-in-use') {
+                        alert("This email is already registered. Please log in instead.");
+                    } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                        alert("Invalid email or password. Please try again.");
+                    } else {
+                        alert("Error: " + error.message);
                     }
                 } finally {
                     document.getElementById('loadingOverlay').classList.add('hidden');
@@ -804,6 +864,7 @@
                     bgMusic.pause();
                     await signOut(auth);
                     this.state.registered = false;
+                    this.state.isLoginMode = false; // Reset toggle
                     this.showScreen('welcomeScreen');
                 } catch (error) {
                     console.error("Logout Error:", error);
